@@ -5,6 +5,9 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 
+CONTENT_PATH = "City.jpg"
+STYLE_PATH = "StarryNight.jpg"
+
 def load_image(img_path, max_size=400, shape=None):
     """画像を読込む"""
     image = Image.open(img_path).convert("RGB")
@@ -34,7 +37,7 @@ def im_convert(tensor):
     return image
 
 def get_features(image, model):
-  
+    """inputをCNNに入れた時の途中の値を辞書にして返す"""
     layers = {
         "0": "conv1_1", 
         "5": "conv2_1",
@@ -54,16 +57,14 @@ def get_features(image, model):
     return features
 
 def gram_matrix(tensor):
-    b, d, h, w = tensor.size() #batch, depth, height, weight
+    """グラム行列によってstyleの類似度を計算する"""
+    _, d, h, w = tensor.size() #batch, depth, height, weight
     tensor = tensor.view(d, h * w)
     gram = torch.mm(tensor, tensor.t())
     return gram
 
-def fix_parameters(model):
-    for param in model.parameters():
-        param.require_grad_ = True
-
 def calc_style_loss(style_weights, target_features, style_grams):
+    """styleのloss"""
     style_loss = 0
     for layer in style_weights:
         target_feature = target_features[layer]
@@ -75,20 +76,18 @@ def calc_style_loss(style_weights, target_features, style_grams):
     return style_loss
 
 def main(device):
-    # 学習済みモデルのimport 
+    # 学習済みモデル
     vgg = models.vgg19(pretrained=True).features # CNNの部分だけ
     for param in vgg.parameters():
-      param.requires_grad_(False)
+      param.requires_grad_(False) #パラメータは固定
     vgg.to(device)
 
     # contentとstyleの画像
-    content_path = "nagaoka.jpg"
-    style_path = "munch.jpg"
-    content = load_image(content_path).to(device)
-    style = load_image(style_path, shape=content.shape[-2:]).to(device)
+    content = load_image(CONTENT_PATH).to(device)
+    style = load_image(STYLE_PATH, shape=content.shape[-2:]).to(device)
 
     # 特徴量の抽出
-    content_features = get_features(content, vgg)
+    content_features = get_features(content, vgg) #{"conv1_1": [[~]]}
     style_features = get_features(style, vgg)
 
     # styleのグラムマトリックス
@@ -107,16 +106,10 @@ def main(device):
     }
 
     #初期値はcontentの画像
-    target  = content.clone().requires_grad_(True).to(device) 
+    target = content.clone().requires_grad_(True).to(device) 
 
     # targetを更新して行く
     optimizer = optim.Adam([target], lr=0.003)
-
-    # targetのarray
-    height, width, channels = im_convert(target).shape
-    image_array = np.empty(shape=(300, height, width, channels))
-    capture_frame = steps/300
-    counter = 0
 
     for ii in range(1, steps+1):
         target_features = get_features(target, vgg)
@@ -136,10 +129,6 @@ def main(device):
             plt.imshow(im_convert(target))
             plt.axis("off")
             plt.show()
-        
-        # if ii % capture_frame == 0:
-        #     image_array[counter] = im_convert(target)
-        #     counter += 1
 
 
 if __name__ == '__main__':
