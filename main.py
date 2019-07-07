@@ -34,6 +34,7 @@ def im_convert(tensor):
     return image
 
 def get_features(image, model):
+  
     layers = {
         "0": "conv1_1", 
         "5": "conv2_1",
@@ -41,13 +42,15 @@ def get_features(image, model):
         "19": "conv4_1", 
         "21": "conv4_2", #content extraction
         "28": "conv5_1" 
-            }
-            
+             }
+
     features = {}
+
     for name, layer in model._modules.items():
         image = layer(image)
-    if name in layers:
-        features[layers[name]] = image
+        if name in layers:
+            features[layers[name]] = image
+
     return features
 
 def gram_matrix(tensor):
@@ -74,12 +77,13 @@ def calc_style_loss(style_weights, target_features, style_grams):
 def main(device):
     # 学習済みモデルのimport 
     vgg = models.vgg19(pretrained=True).features # CNNの部分だけ
-    vgg = fix_parameters(vgg)
+    for param in vgg.parameters():
+      param.requires_grad_(False)
     vgg.to(device)
 
     # contentとstyleの画像
-    content_path = "City.jpg"
-    style_path = "StarryNight.jpg"
+    content_path = "nagaoka.jpg"
+    style_path = "munch.jpg"
     content = load_image(content_path).to(device)
     style = load_image(style_path, shape=content.shape[-2:]).to(device)
 
@@ -92,7 +96,7 @@ def main(device):
 
     content_weight = 1
     style_weight = 1e6
-    steps = 2100
+    steps = 9000
     show_every = 300
     style_weights = {
         "conv1_1": 1, 
